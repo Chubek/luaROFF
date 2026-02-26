@@ -8,7 +8,7 @@ This software uses the Sol2 header-only C++ library to interoperate with Lua. I 
 
 I don't think any proprietor of Sol2 will see this repository, so I digress. I only did this preprocessor in C++ because of Sol2. A very robust piece of metaprogramming. I am not shipping Lua, though. You can install it yourself from your package manager. Lua does not need separate dev builds, even if you use Debian. Lua is the library itself. A sort of homoiconocity of extensions.
 
-To install this application, alongside the manpage, and the Vim/Neovim syntax file:
+To install this application, alongside the manpage:
 
 ```sh
 $ mkdir build && cd build
@@ -16,4 +16,4 @@ $ cmake ..
 $ make && cmake install
 ```
 
-
+There are some goodies in `contrib/`. Manual is in `docs/VADE_MECUM.md`, but the manpage has all you need, just type in `man pplua` and swim in sloppy goodness of Opus 4-generated docs.
