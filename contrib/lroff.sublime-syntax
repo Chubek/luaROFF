@@ -1,0 +1,431 @@
+%YAML 1.2
+---
+# Sublime Syntax file for lroff (groff/troff with embedded Lua via pplua)
+# Install to: ~/.config/bat/syntaxes/lroff.sublime-syntax
+# Then run: bat cache --build
+# File types: *.lroff *.roff *.groff *.ms *.me *.mom *.man *.tmac
+
+name: lroff
+file_extensions:
+  - lroff
+  - roff
+  - groff
+  - ms
+  - me
+  - mom
+  - man
+  - tmac
+  - tr
+  - nroff
+first_line_match: '^[.'']\\"|^\.\s*(TH|SH|NH|TL|START)\b'
+scope: source.lroff
+
+variables:
+  # Valid groff identifier characters
+  ident: '[a-zA-Z_][a-zA-Z0-9_]*'
+  # Scaling units
+  unit: '[icpPnmMvsufz]'
+
+contexts:
+  main:
+    - include: comments
+    - include: lua-block
+    - include: lua-inline
+    - include: preprocessor-blocks
+    - include: requests
+    - include: escapes
+    - include: text
+
+  # ==========================================================================
+  # COMMENTS
+  # ==========================================================================
+  comments:
+    # Full line comments: .\" or .\# or '\" or '\#
+    - match: '^[.''][ \t]*\\[#"].*$'
+      scope: comment.line.lroff
+    # Inline comment starting with \" or \#
+    - match: '\\[#"].*$'
+      scope: comment.line.inline.lroff
+
+  # ==========================================================================
+  # EMBEDDED LUA - BLOCK
+  # ==========================================================================
+  lua-block:
+    - match: '^\.[ \t]*lua[ \t]*$'
+      scope: keyword.control.lua-begin.lroff
+      push: lua-block-body
+
+  lua-block-body:
+    - meta_scope: meta.embedded.block.lua.lroff
+    - meta_content_scope: source.lua.embedded
+    - match: '^\.[ \t]*endlua[ \t]*$'
+      scope: keyword.control.lua-end.lroff
+      pop: true
+    - include: scope:source.lua
+      apply_prototype: true
+    - include: lua-lroff-api
+
+  # ==========================================================================
+  # EMBEDDED LUA - INLINE
+  # ==========================================================================
+  lua-inline:
+    # \lua'expression'
+    - match: '\\lua'''
+      scope: keyword.control.lua-inline.lroff
+      push: lua-inline-single-quote
+    # \lua{expression}
+    - match: '\\lua\{'
+      scope: keyword.control.lua-inline.lroff
+      push: lua-inline-brace
+
+  lua-inline-single-quote:
+    - meta_scope: meta.embedded.inline.lua.lroff
+    - meta_content_scope: source.lua.embedded
+    - match: ''''
+      scope: keyword.control.lua-inline.lroff
+      pop: true
+    - include: lua-lroff-api
+    - include: scope:source.lua
+
+  lua-inline-brace:
+    - meta_scope: meta.embedded.inline.lua.lroff
+    - meta_content_scope: source.lua.embedded
+    - match: '\}'
+      scope: keyword.control.lua-inline.lroff
+      pop: true
+    - include: lua-lroff-api
+    - include: scope:source.lua
+
+  # lroff API highlighting within Lua contexts
+  lua-lroff-api:
+    - match: '\blroff\b'
+      scope: support.module.lroff
+    - match: '\b(emit|emitln|request|printf|blank)\b'
+      scope: support.function.output.lroff
+    - match: '\b(escape|inline_escape)\b'
+      scope: support.function.escape.lroff
+    - match: '\b(font|size|with_font|with_size)\b'
+      scope: support.function.style.lroff
+    - match: '\b(nr_set|nr_get|nr_ref|ds_set|ds_get|ds_ref)\b'
+      scope: support.function.register.lroff
+    - match: '\b(divert_begin|divert_end|divert_emit|divert_get)\b'
+      scope: support.function.diversion.lroff
+    - match: '\b(macro_define|macro_define_lua)\b'
+      scope: support.function.macro.lroff
+    - match: '\b(bold|italic|mono|special_char)\b'
+      scope: support.function.text.lroff
+    - match: '\b(section|title|author|paragraph)\b'
+      scope: support.function.document.lroff
+    - match: '\b(bullet_list|numbered_list|def_list|table)\b'
+      scope: support.function.structure.lroff
+    - match: '\b(unique|version|map|foreach|indented)\b'
+      scope: support.function.utility.lroff
+
+  # ==========================================================================
+  # PREPROCESSOR BLOCKS (tbl, eqn, pic, grap, refer, chem, ideal)
+  # ==========================================================================
+  preprocessor-blocks:
+    # tbl
+    - match: '^\.[ \t]*TS\b.*$'
+      scope: keyword.control.preprocessor.tbl.lroff
+      push: tbl-block
+    # eqn
+    - match: '^\.[ \t]*EQ\b.*$'
+      scope: keyword.control.preprocessor.eqn.lroff
+      push: eqn-block
+    # pic
+    - match: '^\.[ \t]*PS\b.*$'
+      scope: keyword.control.preprocessor.pic.lroff
+      push: pic-block
+    # grap
+    - match: '^\.[ \t]*G1\b.*$'
+      scope: keyword.control.preprocessor.grap.lroff
+      push: grap-block
+    # refer
+    - match: '^\.[ \t]*R1\b.*$'
+      scope: keyword.control.preprocessor.refer.lroff
+      push: refer-block
+    # ideal
+    - match: '^\.[ \t]*IS\b.*$'
+      scope: keyword.control.preprocessor.ideal.lroff
+      push: ideal-block
+    # chem
+    - match: '^\.[ \t]*cstart\b.*$'
+      scope: keyword.control.preprocessor.chem.lroff
+      push: chem-block
+
+  tbl-block:
+    - meta_scope: meta.preprocessor.tbl.lroff
+    - match: '^\.[ \t]*TE\b.*$'
+      scope: keyword.control.preprocessor.tbl.lroff
+      pop: true
+    - match: '^\.[ \t]*T[H&]\b.*$'
+      scope: keyword.control.preprocessor.tbl.lroff
+    - include: escapes
+    - include: comments
+
+  eqn-block:
+    - meta_scope: meta.preprocessor.eqn.lroff
+    - match: '^\.[ \t]*EN\b.*$'
+      scope: keyword.control.preprocessor.eqn.lroff
+      pop: true
+    # eqn keywords
+    - match: '\b(sub|sup|from|to|over|sqrt|hat|bar|dot|dotdot|tilde|vec|dyad|under|pile|lpile|rpile|cpile|above|matrix|lcol|rcol|ccol|col|left|right|ceil|floor|define|ndefine|tdefine|undef|gfont|gsize|mark|lineup|bold|italic|roman|font|size|fat|back|fwd|up|down|delim|chartype|type|vcenter|special|space|ifdef|include|copy)\b'
+      scope: keyword.other.eqn.lroff
+    # eqn Greek letters and symbols
+    - match: '\b(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|omicron|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega|GAMMA|DELTA|THETA|LAMBDA|XI|PI|SIGMA|UPSILON|PHI|PSI|OMEGA|inf|partial|half|prime|approx|nothing|cdot|times|del|grad|sum|prod|int|union|inter|cap|cup|langle|rangle|dagger|ddagger)\b'
+      scope: constant.language.eqn.lroff
+    - include: comments
+
+  pic-block:
+    - meta_scope: meta.preprocessor.pic.lroff
+    - match: '^\.[ \t]*(PE|PF|PY)\b.*$'
+      scope: keyword.control.preprocessor.pic.lroff
+      pop: true
+    # pic keywords
+    - match: '\b(box|circle|ellipse|arc|line|arrow|spline|move|copy|for|if|else|do|reset|print|sh|exec|define|undef|sprintf|sin|cos|atan2|log|exp|sqrt|int|rand|srand|max|min|fill|filled|solid|dashed|dotted|invisible|ljust|rjust|above|below|at|with|by|then|from|to|rad|diam|ht|wid|thick|chop|same|cw|ccw|here|last|between|of|the|way|start|end|center|north|south|east|west|ne|nw|se|sw|top|bot|right|left|up|down|and|or|not)\b'
+      scope: keyword.other.pic.lroff
+    # pic numbers with units
+    - match: '(\d+\.?\d*|\.\d+)(in|cm|mm|pt|pc|px|i|c|m|p)?'
+      scope: constant.numeric.pic.lroff
+    - include: comments
+
+  grap-block:
+    - meta_scope: meta.preprocessor.grap.lroff
+    - match: '^\.[ \t]*G2\b.*$'
+      scope: keyword.control.preprocessor.grap.lroff
+      pop: true
+    - match: '\b(frame|label|coord|ticks|grid|line|draw|new|next|plot|pic|copy|for|if|else|print|define|sprintf|sh)\b'
+      scope: keyword.other.grap.lroff
+    - include: comments
+
+  refer-block:
+    - meta_scope: meta.preprocessor.refer.lroff
+    - match: '^\.[ \t]*R2\b.*$'
+      scope: keyword.control.preprocessor.refer.lroff
+      pop: true
+    - include: comments
+
+  ideal-block:
+    - meta_scope: meta.preprocessor.ideal.lroff
+    - match: '^\.[ \t]*IE\b.*$'
+      scope: keyword.control.preprocessor.ideal.lroff
+      pop: true
+    - include: comments
+
+  chem-block:
+    - meta_scope: meta.preprocessor.chem.lroff
+    - match: '^\.[ \t]*cend\b.*$'
+      scope: keyword.control.preprocessor.chem.lroff
+      pop: true
+    - include: comments
+
+  # ==========================================================================
+  # REQUESTS (lines starting with . or ')
+  # ==========================================================================
+  requests:
+    # Ignore blocks: .ig through ..
+    - match: '^\.[ \t]*ig\b.*$'
+      scope: keyword.control.ignore.lroff
+      push: ignore-block
+    # Macro definition blocks: .de, .de1, .dei, .dei1, .am, .am1, .ami, .ami1
+    - match: '^\.[ \t]*(de|de1|dei|dei1|am|am1|ami|ami1)\b'
+      scope: keyword.control.macro-definition.lroff
+      push: macro-definition
+    # Control flow requests
+    - match: '^\.[ \t]*(if|ie|el|while|break|continue|do|nop|return)\b'
+      scope: keyword.control.flow.lroff
+      push: request-args
+    # Page layout requests
+    - match: '^\.[ \t]*(br|sp|ne|bp|pl|po|ll|in|ti|ce|rj|fi|nf|na|ad|hy|nh|hc|hw|hla|hlm|hpf|hpfa|hpfcode|mk|rt|ns|rs|sv|os|fl)\b'
+      scope: keyword.other.page.lroff
+      push: request-args
+    # Font and style requests
+    - match: '^\.[ \t]*(ft|ps|vs|ss|cs|bd|ul|cu|uf|fam|fcolor|gcolor|sty|fzoom|fspecial|ftr|fp|kern|tkf|lg)\b'
+      scope: storage.type.font.lroff
+      push: request-args
+    # Register and string requests
+    - match: '^\.[ \t]*(nr|rr|rnn|aln|af|ds|as|ds1|as1|substring|length|char|rchar|fchar|schar|fschar|shc|hcode|code)\b'
+      scope: storage.type.register.lroff
+      push: request-args
+    # Trap and environment requests
+    - match: '^\.[ \t]*(wh|ch|dt|it|itc|em|blm|ev|evc|vpt|pvs)\b'
+      scope: keyword.control.trap.lroff
+      push: request-args
+    # Diversion requests
+    - match: '^\.[ \t]*(di|da|box|boxa|output|asciify|unformat)\b'
+      scope: keyword.control.diversion.lroff
+      push: request-args
+    # I/O and system requests
+    - match: '^\.[ \t]*(so|soquiet|mso|msoquiet|cf|sy|pi|pso|open|opena|close|write|writec|writem|trf|nx|rd|ex|ab|lf|tm|tm1|tmc)\b'
+      scope: keyword.control.io.lroff
+      push: request-args
+    # Device control
+    - match: '^\.[ \t]*(device|devicem|tag|taga|color|defcolor)\b'
+      scope: keyword.control.device.lroff
+      push: request-args
+    # Debugging
+    - match: '^\.[ \t]*(backtrace|lsm|lsn|pm|pnr|ptr|fl|warn|spreadwarn)\b'
+      scope: keyword.control.debug.lroff
+      push: request-args
+    # man(7) macros
+    - match: '^\.[ \t]*(TH|SH|SS|TP|IP|HP|LP|PP|P|RS|RE|UR|UE|MT|ME|SY|YS|OP|EX|EE|MR|BR|BI|IR|IB|RI|RB|SM|SB)\b'
+      scope: entity.name.function.man.lroff
+      push: request-args
+    # ms macros
+    - match: '^\.[ \t]*(NH|TL|AU|AI|AB|AE|DA|ND|FS|FE|KS|KE|KF|DS|DE|LD|ID|CD|RD|BD|QP|QS|QE|XP|B1|B2|MC|1C|2C|AM|BX|UL|LG|NL|R|B|I|BI|BG|CW)\b'
+      scope: entity.name.function.ms.lroff
+      push: request-args
+    # mom macros
+    - match: '^\.[ \t]*(START|DOC_TITLE|TITLE|SUBTITLE|AUTHOR|CHAPTER|CHAPTER_TITLE|HEADING|PARAHEAD|SUBHEAD|QUOTE|BLOCKQUOTE|CODE|LIST|ITEM|ENDLIST|FOOTNOTE|ENDNOTE|TOC|COLLATE|NEWPAGE|PRINTSTYLE|PAPER|DOCTYPE|COPYSTYLE|FAM|PT_SIZE|LS|JUSTIFY|LEFT|RIGHT|CENTER|QUAD)\b'
+      scope: entity.name.function.mom.lroff
+      push: request-args
+    # mm macros
+    - match: '^\.[ \t]*(H|HU|HC|HX|HY|HZ|P|AS|AE|MT|AF|AU|TL|SA|NS|NE|OK|OP|ND|COVER|COVEND|LI|LE|LB|AL|BL|DL|ML|RL|VL|LC|GETST|TC|TX|TY|FG|TB|EX|EC|EF|OF|EH|OH|PH|EF|PF|MULB|MULE|MULN|DF|DE|DS)\b'
+      scope: entity.name.function.mm.lroff
+      push: request-args
+    # Generic request fallback
+    - match: '^[.''][ \t]*([a-zA-Z_][a-zA-Z0-9_]*)'
+      captures:
+        1: entity.name.function.request.lroff
+      push: request-args
+    # Request continuation with ''' at beginning of line
+    - match: '^''[ \t]*'
+      scope: keyword.operator.continuation.lroff
+      push: request-args
+
+  request-args:
+    - meta_scope: meta.request.lroff
+    - match: '$'
+      pop: true
+    - include: escapes
+    - include: comments
+    # Quoted string arguments
+    - match: '"'
+      scope: punctuation.definition.string.begin.lroff
+      push: double-quoted-string
+    # Numeric expressions with units
+    - match: '([+-]?\d+\.?\d*|\.\d+)({{unit}})?'
+      scope: constant.numeric.lroff
+    # Conditional expressions
+    - match: '\b(n|t|o|e|v|r|d|c|m|F|S)\b'
+      scope: support.constant.condition.lroff
+
+  double-quoted-string:
+    - meta_scope: string.quoted.double.lroff
+    - match: '"'
+      scope: punctuation.definition.string.end.lroff
+      pop: true
+    - include: escapes
+    - match: '\\.'
+      scope: constant.character.escape.lroff
+
+  ignore-block:
+    - meta_scope: comment.block.ignore.lroff
+    - match: '^\.\.\s*$'
+      pop: true
+
+  macro-definition:
+    - meta_scope: meta.macro.definition.lroff
+    - match: '^\.\.\s*$'
+      scope: keyword.control.macro-end.lroff
+      pop: true
+    - include: escapes
+    - include: comments
+    # Macro argument references
+    - match: '\\\\?\$[@*0-9]'
+      scope: variable.parameter.macro.lroff
+
+  # ==========================================================================
+  # ESCAPES (inline backslash sequences)
+  # ==========================================================================
+  escapes:
+    # Special characters: \(xx \[name] \C'name'
+    - match: '\\[\(]\S{2}'
+      scope: constant.character.special.lroff
+    - match: '\\\[[^\]]+\]'
+      scope: constant.character.special.lroff
+    - match: '\\C''[^'']+'''
+      scope: constant.character.special.lroff
+
+    # String interpolation: \*x \*(xx \*[name]
+    - match: '\\\*[a-zA-Z]'
+      scope: variable.other.string.lroff
+    - match: '\\\*\([a-zA-Z]{2}'
+      scope: variable.other.string.lroff
+    - match: '\\\*\[[^\]]+\]'
+      scope: variable.other.string.lroff
+
+    # Register interpolation: \nx \n(xx \n[name] \n+[name] \n-[name]
+    - match: '\\n[+-]?[a-zA-Z]'
+      scope: variable.other.register.lroff
+    - match: '\\n[+-]?\([a-zA-Z]{2}'
+      scope: variable.other.register.lroff
+    - match: '\\n[+-]?\[[^\]]+\]'
+      scope: variable.other.register.lroff
+
+    # Font escapes: \fx \f(xx \f[name]
+    - match: '\\f[a-zA-Z0-9]'
+      scope: storage.type.font.escape.lroff
+    - match: '\\f\([a-zA-Z0-9]{2}'
+      scope: storage.type.font.escape.lroff
+    - match: '\\f\[[^\]]+\]'
+      scope: storage.type.font.escape.lroff
+
+    # Size escapes: \sN \s(NN \s[±N] \s'N'
+    - match: '\\s[+-]?\d{1,2}'
+      scope: constant.numeric.size.lroff
+    - match: '\\s[+-]?\(\d{2}'
+      scope: constant.numeric.size.lroff
+    - match: '\\s[+-]?\[[^\]]+\]'
+      scope: constant.numeric.size.lroff
+    - match: '\\s''[^'']*'''
+      scope: constant.numeric.size.lroff
+
+    # Color escapes: \m[name] \M[name]
+    - match: '\\[mM]\[[^\]]+\]'
+      scope: support.constant.color.lroff
+    - match: '\\[mM][a-zA-Z]'
+      scope: support.constant.color.lroff
+
+    # Drawing escapes: \D'...' \l'...' \L'...' \h'...' \v'...' \w'...'
+    - match: '\\[DlLhvwHoXYkRSAbp]''[^'']*'''
+      scope: keyword.operator.drawing.lroff
+    - match: '\\[DlLhvwHoXYkRSAbp]\[[^\]]*\]'
+      scope: keyword.operator.drawing.lroff
+
+    # Motion and spacing escapes
+    - match: '\\[udrzsc|^0~&\)!?%{}\/,]'
+      scope: keyword.operator.motion.lroff
+
+    # Numbered character: \N'nnn'
+    - match: '\\N''\d+'''
+      scope: constant.character.numeric.lroff
+
+    # Backslash-newline continuation
+    - match: '\\$'
+      scope: punctuation.separator.continuation.lroff
+
+    # Escape-to-literal: \e \\ \& \) \! \? \/ \,
+    - match: '\\[e\\&\)!?\/,]'
+      scope: constant.character.escape.lroff
+
+    # Arbitrary character definition \[charXX]
+    - match: '\\[a-zA-Z]'
+      scope: constant.character.escape.lroff
+
+  # ==========================================================================
+  # TEXT (body content)
+  # ==========================================================================
+  text:
+    # Lines not starting with . or ' are body text
+    - match: '^(?![.''])'
+      push: text-line
+
+  text-line:
+    - meta_scope: text.plain.lroff
+    - match: '$'
+      pop: true
+    - include: escapes
+    - include: lua-inline
+    - include: comments
