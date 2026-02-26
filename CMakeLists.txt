@@ -55,3 +55,4 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 install(TARGETS pplua DESTINATION bin)
+install(FILES docs/pplua.1 DESTINATION share/man/man1)
