@@ -1,0 +1,123 @@
+.\" phrasebook.roff
+.\" Build:
+.\"   pplua -D LANG=fr phrasebook.roff | groff -ms -Tpdf > french.pdf
+.\"   pplua -D LANG=de phrasebook.roff | groff -ms -Tpdf > german.pdf
+.\"   pplua -D LANG=ja phrasebook.roff | groff -ms -Tpdf > japanese.pdf
+.
+.lua
+-- ============================================================
+-- Phrase database
+-- ============================================================
+phrases = {
+    {
+        en = "Hello",
+        fr = "Bonjour",
+        de = "Hallo",
+        ja = "\\(kokonnichiwa\\(co",  -- placeholder romanization
+        category = "Greetings",
+    },
+    {
+        en = "Thank you",
+        fr = "Merci",
+        de = "Danke",
+        ja = "Arigatou",
+        category = "Greetings",
+    },
+    {
+        en = "Where is the train station?",
+        fr = "O\\(`u est la gare?",
+        de = "Wo ist der Bahnhof?",
+        ja = "Eki wa doko desu ka?",
+        category = "Travel",
+    },
+    {
+        en = "How much does this cost?",
+        fr = "Combien \\(,ca co\\(^ute?",
+        de = "Was kostet das?",
+        ja = "Ikura desu ka?",
+        category = "Shopping",
+    },
+    {
+        en = "I would like a coffee, please.",
+        fr = "Je voudrais un caf\\('e, s'il vous pla\\(^it.",
+        de = "Ich h\\(\"atte gerne einen Kaffee, bitte.",
+        ja = "Koohii o kudasai.",
+        category = "Food & Drink",
+    },
+    {
+        en = "Excuse me",
+        fr = "Excusez-moi",
+        de = "Entschuldigung",
+        ja = "Sumimasen",
+        category = "Politeness",
+    },
+}
+
+-- Determine target language from -D LANG=xx
+target = LANG or "fr"
+
+lang_names = {
+    fr = "French",
+    de = "German",
+    ja = "Japanese",
+}
+lang_name = lang_names[target] or target:upper()
+
+-- Group phrases by category
+categories = {}
+cat_order  = {}
+for _, p in ipairs(phrases) do
+    if not categories[p.category] then
+        categories[p.category] = {}
+        cat_order[#cat_order + 1] = p.category
+    end
+    table.insert(categories[p.category], p)
+end
+.endlua
+.
+.\" ---- Header ----
+.lua
+lroff.title("Traveler's Phrasebook: English " ..
+    lroff.special_char("->") .. " " .. lang_name)
+lroff.author("pplua Language Tools")
+.endlua
+.LP
+.DA
+.AB
+A pocket phrasebook containing \lua'#phrases' essential phrases
+in \lua'lang_name', organized by category.
+Target language code:
+.B "\lua'target'" .
+.AE
+.
+.\" ---- Phrases by category ----
+.lua
+for _, cat in ipairs(cat_order) do
+    lroff.section(cat:upper())
+    lroff.blank()
+
+    local hdr  = {"English", lang_name}
+    local rows = {}
+    for _, p in ipairs(categories[cat]) do
+        rows[#rows + 1] = {p.en, lroff.bold(p[target] or "(?)")}
+    end
+    lroff.table(hdr, rows, "center box;")
+end
+.endlua
+.
+.\" ---- Quick-reference card (all phrases, compact) ----
+.lua
+lroff.section("QUICK REFERENCE")
+lroff.paragraph()
+lroff.emitln("All phrases at a glance:")
+lroff.blank()
+
+local all_items = {}
+for _, p in ipairs(phrases) do
+    all_items[#all_items + 1] = {
+        p.en,
+        lroff.bold(p[target] or "(?)")
+    }
+end
+lroff.def_list(all_items)
+.endlua

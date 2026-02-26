@@ -1,0 +1,123 @@
+.\" exam.roff
+.\" Build: pplua -D SEED=42 exam.roff | groff -ms -Tpdf > exam.pdf
+.
+.lua
+-- ============================================================
+-- Seed the RNG (use -D SEED=N for reproducible variants)
+-- ============================================================
+local seed = tonumber(SEED) or os.time()
+math.randomseed(seed)
+
+-- Fisher-Yates shuffle, returns shuffled copy + new index of
+-- the element that was originally at position 'correct_idx'
+function shuffle_answers(answers, correct_idx)
+    local a = {}
+    for i, v in ipairs(answers) do a[i] = {text = v, orig = i} end
+    for i = #a, 2, -1 do
+        local j = math.random(i)
+        a[i], a[j] = a[j], a[i]
+    end
+    local new_correct
+    local texts = {}
+    for i, entry in ipairs(a) do
+        texts[i] = entry.text
+        if entry.orig == correct_idx then new_correct = i end
+    end
+    return texts, new_correct
+end
+
+-- Question bank
+questions = {
+    {
+        text = "What is the time complexity of binary search on a sorted array of $n$ elements?",
+        answers = {"$O(n)$", "$O(log n)$", "$O(n log n)$", "$O(1)$"},
+        correct = 2,
+    },
+    {
+        text = "Which data structure uses LIFO (Last In, First Out) ordering?",
+        answers = {"Queue", "Stack", "Heap", "Deque"},
+        correct = 2,
+    },
+    {
+        text = "In Unix, which signal is sent by default when you press Ctrl+C?",
+        answers = {"SIGTERM", "SIGKILL", "SIGINT", "SIGHUP"},
+        correct = 3,
+    },
+    {
+        text = "What does the HTTP status code 418 mean?",
+        answers = {"Not Found", "I'm a teapot",
+                   "Internal Server Error", "Unauthorized"},
+        correct = 2,
+    },
+    {
+        text = "Which sorting algorithm has a worst-case time complexity of $O(n^2)$ but is often fast in practice?",
+        answers = {"Merge Sort", "Heap Sort", "Quick Sort", "Radix Sort"},
+        correct = 3,
+    },
+}
+
+-- Shuffle and record answer key
+answer_key = {}
+for i, q in ipairs(questions) do
+    local shuffled, correct_pos = shuffle_answers(q.answers, q.correct)
+    q.shuffled = shuffled
+    q.shuffled_correct = correct_pos
+    answer_key[i] = correct_pos
+end
+
+-- Letter labels
+function letter(n) return string.char(64 + n) end   -- 1→A, 2→B, …
+.endlua
+.
+.\" ---- Exam header ----
+.lua
+lroff.title("CS 201 " .. lroff.special_char("em") .. " Midterm Examination")
+lroff.author("Department of Computer Science")
+.endlua
+.LP
+.DA
+.sp 1
+.ce 2
+Variant seed: \lua'seed'
+Time allowed: 60 minutes
+.sp 1
+.LP
+.B "Instructions:"
+Answer all \lua'#questions' questions.
+Circle the letter of the correct answer.
+Each question is worth \lua'math.floor(100 / #questions)' points.
+.
+.\" ---- Questions ----
+.lua
+lroff.section("QUESTIONS")
+
+for i, q in ipairs(questions) do
+    lroff.blank()
+    lroff.printfln(".IP %d. 4", i)
+    lroff.emitln(q.text)
+
+    lroff.blank()
+    for j, ans in ipairs(q.shuffled) do
+        lroff.printfln(".RS 4")
+        lroff.printfln(".IP %s) 4", letter(j))
+        lroff.emitln(ans)
+        lroff.request("RE")
+    end
+end
+.endlua
+.
+.\" ---- Page break, then answer key ----
+.lua
+lroff.request("bp")
+lroff.section("ANSWER KEY (for instructor use only)")
+lroff.paragraph()
+lroff.printfln("Variant seed: %s", tostring(seed))
+lroff.blank()
+
+local hdr = {"#", "Answer"}
+local rows = {}
+for i, pos in ipairs(answer_key) do
+    rows[#rows + 1] = {tostring(i), lroff.bold(letter(pos))}
+end
+lroff.table(hdr, rows, "center box;")
+.endlua

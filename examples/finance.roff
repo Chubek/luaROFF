@@ -1,0 +1,160 @@
+.\" finance.roff
+.\" Build: pplua finance.roff | tbl | groff -ms -Tpdf > finance.pdf
+.
+.lua
+-- ============================================================
+-- Financial data
+-- ============================================================
+quarters = {
+    {label = "Q1 2025", revenue = 1240000, expenses = 890000},
+    {label = "Q2 2025", revenue = 1510000, expenses = 920000},
+    {label = "Q3 2025", revenue = 1380000, expenses = 1010000},
+    {label = "Q4 2025", revenue = 1720000, expenses = 980000},
+}
+
+-- Compute derived fields
+total_revenue  = 0
+total_expenses = 0
+max_revenue    = 0
+
+for _, q in ipairs(quarters) do
+    q.profit = q.revenue - q.expenses
+    q.margin = (q.profit / q.revenue) * 100
+    total_revenue  = total_revenue  + q.revenue
+    total_expenses = total_expenses + q.expenses
+    if q.revenue > max_revenue then max_revenue = q.revenue end
+end
+
+total_profit = total_revenue - total_expenses
+total_margin = (total_profit / total_revenue) * 100
+
+-- Format a number as $X,XXX,XXX
+function fmt_money(n)
+    local s = string.format("%.0f", n)
+    -- insert commas from right
+    local result = ""
+    local count = 0
+    for i = #s, 1, -1 do
+        if count > 0 and count % 3 == 0 then
+            result = "," .. result
+        end
+        result = s:sub(i,i) .. result
+        count = count + 1
+    end
+    return "$" .. result
+end
+
+-- Build a text bar: ████░░░░ style using groff's \[br] and spaces
+-- Actually, we'll use a horizontal rule \l'Np' of proportional width
+function bar(value, max_val, total_width_inches)
+    local width = (value / max_val) * total_width_inches
+    return string.format("\\l'%.2fi\\[ul]'", width)
+end
+
+-- QoQ delta
+function delta_str(current, previous)
+    if not previous then return lroff.special_char("em") end
+    local pct = ((current - previous) / previous) * 100
+    if pct >= 0 then
+        return string.format("+%.1f%%", pct)
+    else
+        return string.format("%.1f%%", pct)
+    end
+end
+.endlua
+.
+.\" ---- Header ----
+.lua
+lroff.title("Quarterly Financial Summary " ..
+    lroff.special_char("em") .. " FY 2025")
+lroff.author("Finance Department")
+.endlua
+.LP
+.DA
+.AB
+Annual revenue: \lua'fmt_money(total_revenue)'.
+Annual profit: \lua'fmt_money(total_profit)'
+(\lua'string.format("%.1f%%", total_margin)' margin).
+Report generated \lua'os.date("%B %d, %Y at %H:%M")'.
+.AE
+.
+.\" ---- Summary Table ----
+.lua
+lroff.section("QUARTERLY BREAKDOWN")
+lroff.paragraph()
+
+local hdr = {"Quarter", "Revenue", "Expenses", "Profit",
+             "Margin", "QoQ " .. lroff.special_char("De")}
+local rows = {}
+for i, q in ipairs(quarters) do
+    local prev_rev = (i > 1) and quarters[i-1].revenue or nil
+    rows[#rows + 1] = {
+        lroff.bold(q.label),
+        fmt_money(q.revenue),
+        fmt_money(q.expenses),
+        fmt_money(q.profit),
+        string.format("%.1f%%", q.margin),
+        delta_str(q.revenue, prev_rev),
+    }
+end
+-- Totals row
+rows[#rows + 1] = {
+    lroff.bold("TOTAL"),
+    lroff.bold(fmt_money(total_revenue)),
+    lroff.bold(fmt_money(total_expenses)),
+    lroff.bold(fmt_money(total_profit)),
+    lroff.bold(string.format("%.1f%%", total_margin)),
+    "",
+}
+lroff.table(hdr, rows, "center allbox;")
+.endlua
+.
+.\" ---- Visual chart ----
+.lua
+lroff.section("REVENUE TREND")
+lroff.paragraph()
+lroff.emitln("Visual comparison (proportional bars):")
+lroff.blank()
+
+for _, q in ipairs(quarters) do
+    lroff.printfln(".IP \"%s\" 12", q.label)
+    lroff.printfln("%s  %s",
+        bar(q.revenue, max_revenue, 3.0),
+        fmt_money(q.revenue))
+end
+.endlua
+.
+.\" ---- Margin analysis ----
+.lua
+lroff.section("MARGIN ANALYSIS")
+lroff.paragraph()
+
+-- Find best and worst quarters
+local best  = quarters[1]
+local worst = quarters[1]
+for _, q in ipairs(quarters) do
+    if q.margin > best.margin  then best  = q end
+    if q.margin < worst.margin then worst = q end
+end
+
+lroff.emitln("The " .. lroff.bold("best") ..
+    " margin was in " .. lroff.bold(best.label) ..
+    string.format(" at %.1f%%.", best.margin))
+lroff.emitln("The " .. lroff.bold("worst") ..
+    " margin was in " .. lroff.bold(worst.label) ..
+    string.format(" at %.1f%%.", worst.margin))
+lroff.blank()
+lroff.emitln("Detailed margin breakdown:")
+lroff.blank()
+
+-- Definition list of margin per quarter
+local items = {}
+for _, q in ipairs(quarters) do
+    items[#items + 1] = {
+        q.label,
+        string.format("%.1f%% margin on %s revenue (%s profit)",
+            q.margin, fmt_money(q.revenue), fmt_money(q.profit))
+    }
+end
+lroff.def_list(items)
+.endlua

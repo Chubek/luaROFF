@@ -1,0 +1,133 @@
+.\" bestiary.roff
+.\" Build: pplua bestiary.roff | tbl | groff -ms -Tpdf > bestiary.pdf
+.
+.lua
+-- ============================================================
+-- Creature database
+-- ============================================================
+creatures = {
+    {
+        name   = "Ember Wyrm",
+        class  = "Dragon",
+        habitat = "Volcanic caverns",
+        str = 18, dex = 12, con = 20, int = 14, wis = 10, cha = 16,
+        abilities = {"Fire Breath (60 ft. cone)", "Tremorsense",
+                     "Frightful Presence"},
+        lore = [[A serpentine dragon that nests in pools of magma.
+Its scales glow like banked coals, and its breath can melt
+castle walls.  Ancient texts warn: where the ground steams
+and stone runs like water, the Ember Wyrm is near.]],
+    },
+    {
+        name   = "Gloom Stalker",
+        class  = "Aberration",
+        habitat = "Deep forest, twilight zones",
+        str = 14, dex = 20, con = 12, int = 6, wis = 18, cha = 4,
+        abilities = {"Shadow Step", "Paralyzing Gaze",
+                     "Spider Climb"},
+        lore = [[A creature of pure shadow that hunts at dusk.
+It moves between patches of darkness as if stepping through
+doors.  Victims report a chill and a sense of being watched
+before the creature strikes with terrifying speed.]],
+    },
+    {
+        name   = "Thornback Basilisk",
+        class  = "Monstrosity",
+        habitat = "Arid scrublands, ruins",
+        str = 16, dex = 8, con = 18, int = 3, wis = 12, cha = 6,
+        abilities = {"Petrifying Gaze", "Venomous Bite",
+                     "Thorn Shield (1d6 reflect)"},
+        lore = [[An eight-legged reptile covered in calcite spines.
+Its gaze petrifies prey, which it later consumes at leisure.
+Alchemists prize its blood for stoneshaping elixirs, but
+harvesting it is, unsurprisingly, hazardous.]],
+    },
+}
+
+-- Compute derived stats
+function modifier(score)
+    return math.floor((score - 10) / 2)
+end
+
+function mod_str(score)
+    local m = modifier(score)
+    if m >= 0 then return string.format("%d (+%d)", score, m)
+    else           return string.format("%d (%d)", score, m)
+    end
+end
+
+function danger_rating(c)
+    -- simple formula: average of all stats, scaled
+    local avg = (c.str + c.dex + c.con + c.int + c.wis + c.cha) / 6
+    if avg >= 17 then return "Lethal", "\\m[red]Lethal\\m[]"
+    elseif avg >= 13 then return "Dangerous", "\\m[red3]Dangerous\\m[]"
+    elseif avg >= 9  then return "Moderate", "Moderate"
+    else return "Low", "Low"
+    end
+end
+.endlua
+.
+.\" ---- Document header ----
+.lua
+lroff.title("Bestiary of the Shattered Realms")
+lroff.author("The Cartographer's Guild")
+.endlua
+.LP
+.AB
+A field guide to \lua'#creatures' creatures encountered in the
+Shattered Realms.  Danger ratings are computed from base
+attributes.  Handle with care.
+.AE
+.
+.\" ---- Table of Contents (dynamically built) ----
+.lua
+lroff.section("TABLE OF CONTENTS")
+lroff.blank()
+for i, c in ipairs(creatures) do
+    local _, dr_plain = danger_rating(c)
+    lroff.printfln(".IP %d. 4", i)
+    lroff.printfln("%s %s %s",
+        lroff.bold(c.name),
+        lroff.special_char("em"),
+        c.class)
+end
+.endlua
+.
+.\" ---- Creature entries ----
+.lua
+for _, c in ipairs(creatures) do
+    local dr_text, dr_styled = danger_rating(c)
+
+    -- Section heading
+    lroff.section(c.name)
+
+    -- Classification line
+    lroff.paragraph()
+    lroff.printfln("%s %s  |  %s %s  |  %s %s",
+        lroff.bold("Class:"), c.class,
+        lroff.bold("Habitat:"), c.habitat,
+        lroff.bold("Danger:"), dr_styled)
+
+    -- Stat block as a tbl table
+    lroff.blank()
+    lroff.table(
+        {"STR", "DEX", "CON", "INT", "WIS", "CHA"},
+        {{mod_str(c.str), mod_str(c.dex), mod_str(c.con),
+          mod_str(c.int), mod_str(c.wis), mod_str(c.cha)}},
+        "center box;"
+    )
+
+    -- Abilities
+    lroff.blank()
+    lroff.paragraph()
+    lroff.emitln(lroff.bold("Abilities:"))
+    lroff.bullet_list(c.abilities)
+
+    -- Lore
+    lroff.paragraph()
+    lroff.emitln(lroff.italic("Field Notes:"))
+    lroff.paragraph("QP")
+    -- Escape the lore text so that any '.' at line start is safe
+    lroff.emitln(lroff.escape(c.lore))
+end
+.endlua

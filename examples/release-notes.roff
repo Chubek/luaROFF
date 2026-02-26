@@ -1,0 +1,118 @@
+.\" release-notes.roff
+.\" Build: pplua release-notes.roff | tbl | groff -ms -Tpdf > release.pdf
+.
+.lua
+-- ============================================================
+-- Structured release data — could also be loaded from a file
+-- with  dofile("releases.lua")
+-- ============================================================
+releases = {
+    {
+        version = "3.2.0",
+        date    = "2026-02-20",
+        status  = "stable",
+        changes = {
+            { type = "feature", desc = "Added ARM64 JIT backend" },
+            { type = "feature", desc = "New streaming JSON parser" },
+            { type = "bugfix",  desc = "Fixed race condition in thread pool (#4217)" },
+            { type = "bugfix",  desc = "Corrected off-by-one in ring buffer" },
+            { type = "perf",    desc = "Reduced allocator overhead by 18%" },
+        },
+    },
+    {
+        version = "3.1.2",
+        date    = "2026-01-05",
+        status  = "maintenance",
+        changes = {
+            { type = "bugfix",  desc = "Patched CVE-2026-00142 in TLS handshake" },
+            { type = "bugfix",  desc = "Fixed SIGPIPE handling on FreeBSD" },
+            { type = "docs",    desc = "Rewrote the configuration chapter" },
+        },
+    },
+    {
+        version = "3.1.1",
+        date    = "2025-11-30",
+        status  = "maintenance",
+        changes = {
+            { type = "bugfix",  desc = "Locale-dependent date formatting corrected" },
+            { type = "perf",    desc = "Batch insert now 2x faster on large datasets" },
+        },
+    },
+}
+
+-- helper: icon for change type
+function change_icon(t)
+    if t == "feature" then return lroff.special_char("*>")   -- ✱
+    elseif t == "bugfix" then return lroff.special_char("bu") -- •
+    elseif t == "perf" then return lroff.special_char("ua")   -- ↑
+    elseif t == "docs" then return lroff.special_char("lh")   -- ☞
+    else return lroff.special_char("em")                       -- —
+    end
+end
+
+-- helper: human label
+function change_label(t)
+    local labels = {
+        feature = "New Feature",
+        bugfix  = "Bug Fix",
+        perf    = "Performance",
+        docs    = "Documentation",
+    }
+    return labels[t] or t
+end
+.endlua
+.
+.\" ---- Title page ----
+.lua
+lroff.title("Project Helios " .. lroff.special_char("em") .. " Release Notes")
+lroff.author("Engineering Team")
+.endlua
+.LP
+.DA
+.AB
+This document covers the last \lua'#releases' releases of
+Project Helios, automatically generated from structured Lua data.
+.AE
+.
+.\" ---- Generate a section for each release ----
+.lua
+for _, rel in ipairs(releases) do
+    -- Section heading with version, date, and status badge
+    lroff.section(string.format("Version %s  (%s)  [%s]",
+        rel.version, rel.date, rel.status:upper()))
+
+    -- Summary table: count changes by type
+    local counts = {}
+    for _, c in ipairs(rel.changes) do
+        counts[c.type] = (counts[c.type] or 0) + 1
+    end
+
+    -- Build the summary as a small tbl table
+    local hdr = {"Category", "Count"}
+    local rows = {}
+    for _, t in ipairs({"feature", "bugfix", "perf", "docs"}) do
+        if counts[t] then
+            rows[#rows + 1] = {change_label(t), tostring(counts[t])}
+        end
+    end
+    if #rows > 0 then
+        lroff.paragraph()
+        lroff.emitln(lroff.italic("Change summary:"))
+        lroff.blank()
+        lroff.table(hdr, rows, "center;")
+    end
+
+    -- Detailed list
+    lroff.paragraph()
+    lroff.emitln(lroff.italic("Details:"))
+
+    for _, c in ipairs(rel.changes) do
+        lroff.emitln(string.format(
+            ".IP \"%s %s\" 4",
+            change_icon(c.type),
+            lroff.bold(change_label(c.type))
+        ))
+        lroff.emitln(c.desc)
+    end
+end
+.endlua

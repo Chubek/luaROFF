@@ -1,0 +1,204 @@
+.\" config-guide.roff
+.\" Build: pplua config-guide.roff | tbl | groff -ms -Tpdf > config.pdf
+.
+.lua
+-- ============================================================
+-- Configuration schema
+-- ============================================================
+schema = {
+    {
+        key     = "listen_address",
+        type    = "string",
+        default = "0.0.0.0",
+        range   = nil,
+        desc    = "IP address to bind the server socket to.",
+    },
+    {
+        key     = "listen_port",
+        type    = "integer",
+        default = 8080,
+        range   = {1, 65535},
+        desc    = "TCP port number.  Must be in the range 1\\(en65535.",
+    },
+    {
+        key     = "max_connections",
+        type    = "integer",
+        default = 1024,
+        range   = {1, 100000},
+        desc    = "Maximum simultaneous client connections.",
+    },
+    {
+        key     = "tls_enabled",
+        type    = "boolean",
+        default = false,
+        range   = nil,
+        desc    = "Enable TLS encryption.  Requires tls_cert and tls_key.",
+    },
+    {
+        key     = "tls_cert",
+        type    = "path",
+        default = "/etc/myapp/cert.pem",
+        range   = nil,
+        desc    = "Path to the TLS certificate file (PEM format).",
+    },
+    {
+        key     = "tls_key",
+        type    = "path",
+        default = "/etc/myapp/key.pem",
+        range   = nil,
+        desc    = "Path to the TLS private key file.",
+    },
+    {
+        key     = "log_level",
+        type    = "enum",
+        default = "info",
+        range   = {"debug", "info", "warn", "error", "fatal"},
+        desc    = "Logging verbosity level.",
+    },
+    {
+        key     = "worker_threads",
+        type    = "integer",
+        default = 4,
+        range   = {1, 256},
+        desc    = "Number of worker threads in the request pool.",
+    },
+}
+
+-- Validation: check that defaults match declared types/ranges
+warnings = {}
+for _, opt in ipairs(schema) do
+    if opt.type == "integer" and opt.range then
+        if opt.default < opt.range[1] or opt.default > opt.range[2] then
+            warnings[#warnings + 1] = string.format(
+                "%s: default %s out of range [%d, %d]",
+                opt.key, tostring(opt.default),
+                opt.range[1], opt.range[2])
+        end
+    end
+    if opt.type == "enum" and opt.range then
+        local found = false
+        for _, v in ipairs(opt.range) do
+            if v == opt.default then found = true; break end
+        end
+        if not found then
+            warnings[#warnings + 1] = string.format(
+                "%s: default '%s' not in enum set",
+                opt.key, tostring(opt.default))
+        end
+    end
+end
+
+-- type badge
+function type_badge(t)
+    return lroff.mono(t)
+end
+
+-- format range
+function fmt_range(opt)
+    if not opt.range then return lroff.special_char("em") end
+    if opt.type == "integer" then
+        return string.format("%d \\(en %d", opt.range[1], opt.range[2])
+    elseif opt.type == "enum" then
+        local parts = {}
+        for _, v in ipairs(opt.range) do
+            parts[#parts + 1] = lroff.mono(v)
+        end
+        return table.concat(parts, " | ")
+    end
+    return tostring(opt.range)
+end
+.endlua
+.
+.\" ---- Document ----
+.lua
+lroff.title("myappd.conf " .. lroff.special_char("em") ..
+    " Configuration Reference")
+lroff.author("Operations Team")
+.endlua
+.LP
+.DA
+.AB
+Auto-generated reference for all \lua'#schema' configuration
+directives of
+.B myappd .
+Validated at document build time (\lua'os.date("%Y-%m-%d %H:%M")').
+.AE
+.
+.\" ---- Validation warnings (if any) ----
+.lua
+if #warnings > 0 then
+    lroff.section("BUILD WARNINGS")
+    lroff.paragraph()
+    lroff.emitln("The following schema validation issues were detected:")
+    lroff.blank()
+    lroff.bullet_list(warnings)
+else
+    lroff.comment("Schema validation passed — no warnings.")
+end
+.endlua
+.
+.\" ---- Quick-reference summary table ----
+.lua
+lroff.section("SUMMARY TABLE")
+lroff.paragraph()
+local hdr = {"Directive", "Type", "Default"}
+local rows = {}
+for _, opt in ipairs(schema) do
+    rows[#rows + 1] = {
+        lroff.mono(opt.key),
+        type_badge(opt.type),
+        lroff.mono(tostring(opt.default)),
+    }
+end
+lroff.table(hdr, rows, "center box;")
+.endlua
+.
+.\" ---- Detailed directive entries ----
+.lua
+lroff.section("DIRECTIVE REFERENCE")
+
+for _, opt in ipairs(schema) do
+    -- Use .TP (tagged paragraph) style
+    lroff.emitln(".TP 4")
+    lroff.printfln("%s  %s", lroff.bold(opt.key), type_badge(opt.type))
+    lroff.emitln(opt.desc)
+
+    -- Sub-details via indentation
+    lroff.indented(function()
+        lroff.emitln(lroff.bold("Default: ") ..
+            lroff.mono(tostring(opt.default)))
+        lroff.emitln(lroff.bold("Range: ") .. fmt_range(opt))
+    end)
+    lroff.blank()
+end
+.endlua
+.
+.\" ---- Example config file (built via diversion) ----
+.lua
+lroff.section("EXAMPLE CONFIGURATION FILE")
+lroff.paragraph()
+lroff.emitln("A complete example with all defaults:")
+
+-- Build the example config into a diversion
+lroff.divert_begin("example_config")
+lroff.emitln("# myappd.conf — generated " .. os.date("%Y-%m-%d"))
+lroff.emitln("#")
+for _, opt in ipairs(schema) do
+    lroff.printfln("# %s", opt.desc:gsub("\n", " "))
+    if opt.type == "boolean" then
+        lroff.printfln("%s = %s",
+            opt.key, opt.default and "true" or "false")
+    else
+        lroff.printfln("%s = %s", opt.key, tostring(opt.default))
+    end
+    lroff.emitln("")
+end
+lroff.divert_end()
+
+-- Now emit it inside a display
+lroff.display_begin("I")
+lroff.request("ft CR")
+lroff.divert_emit("example_config")
+lroff.request("ft")
+lroff.display_end()
+.endlua
