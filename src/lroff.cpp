@@ -9,9 +9,11 @@
 #include <cassert>
 #include <cstring>
 
-namespace pplua {
+#ifndef PPLUA_VERSION
+#define PPLUA_VERSION "0.1.0"
+#endif
 
-static constexpr const char* PPLUA_VERSION = "pplua 0.1.0";
+namespace pplua {
 
 LroffLibrary::LroffLibrary(OutputBuffer& output)
     : output_(output), diverts_(output), state_() {}
