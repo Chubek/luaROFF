@@ -9,9 +9,9 @@
 ## 1. What Is `pplua`?
 
 `pplua` sits in the classic **roff preprocessor pipeline** — right alongside `tbl`, `eqn`, and `pic`. It reads your `.roff` source, finds embedded Lua code, executes it, and emits clean groff output. The philosophy is simple: **anything tedious or repetitive in groff can be scripted in Lua**.
-
+```
 your_doc.roff → pplua → tbl → eqn → groff -ms -Tpdf → output.pdf
-
+```
 
 There are two ways to embed Lua:
 
@@ -34,7 +34,7 @@ sudo make install    # installs 'pplua' to /usr/local/bin
 ```
 
 ### Command-Line Options
-
+```
 pplua [options] [file ...]
 
   -e CODE        Execute Lua CODE before processing any input.
@@ -44,7 +44,7 @@ pplua [options] [file ...]
   -n             Suppress .lf line-number directives.
   -V             Print version and exit.
   -h             Print help and exit.
-
+```
 
 ### Typical Pipeline
 
@@ -1250,7 +1250,7 @@ The `.lf` directives emitted by `pplua` (unless suppressed with `-n`) ensure tha
 ---
 
 ## 7. Quick Reference Card
-
+```
 ┌──────────────────────────────────────────────────────┐
 │  .lua            Start a Lua block                   │
 │  .endlua         End a Lua block                     │
@@ -1274,3 +1274,4 @@ The `.lf` directives emitted by `pplua` (unless suppressed with `-n`) ensure tha
 │  lroff.divert_emit(n)  Replay diversion              │
 │  lroff.unique(pfx)     Unique name generator         │
 └──────────────────────────────────────────────────────┘
+```
