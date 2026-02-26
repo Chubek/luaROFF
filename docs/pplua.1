@@ -1,0 +1,745 @@
+.\" pplua(1) manual page
+.\" Process: groff -man -Tutf8 pplua.1
+.\"
+.TH PPLUA 1 "2026-02-26" "pplua 1.0.0" "General Commands Manual"
+.\"
+.\" ====================================================================
+.SH NAME
+.\" ====================================================================
+pplua \- Lua preprocessor for groff document formatting
+.\"
+.\" ====================================================================
+.SH SYNOPSIS
+.\" ====================================================================
+.SY pplua
+.OP \-n
+.OP \-e code
+.OP \-l file
+.OP \-I path
+.OP \-D name\fR=\fIvalue
+.RI [ file\~ .\|.\|.]
+.YS
+.
+.SY pplua
+.B \-V
+.YS
+.
+.SY pplua
+.B \-h
+.YS
+.\"
+.\" ====================================================================
+.SH DESCRIPTION
+.\" ====================================================================
+.B pplua
+is a preprocessor for the
+.BR groff (1)
+document formatting system.
+It reads
+.IR roff -format
+input containing embedded Lua code,
+executes the Lua code,
+and writes the resulting
+.I roff
+source to standard output.
+The output is suitable for further processing by other preprocessors
+.RB ( tbl (1),
+.BR eqn (1),
+.BR pic (1))
+and by
+.BR groff (1)
+itself.
+.
+.PP
+.B pplua
+follows the traditional ROFF preprocessor model established by
+.BR tbl ,
+.BR eqn ,
+and
+.BR pic :
+it sits in a pipeline between the document source and
+.BR groff ,
+transforming its recognized input constructs and passing everything
+else through unchanged.
+.
+.PP
+Two mechanisms are provided for embedding Lua:
+.
+.TP
+.B Block mode
+A region delimited by
+.B .lua
+and
+.B .endlua
+requests.
+All lines between these delimiters are collected and executed as
+a single Lua chunk.
+Any output produced by
+.B lroff
+library calls
+(e.g.,\&
+.BR emit (),
+.BR request (),
+.BR section ())
+is inserted into the output stream at the position of the block.
+.
+.TP
+.B Inline mode
+The escape sequence
+.BI \[rs]lua\[aq] expr \[aq]
+may appear anywhere on a line.
+The Lua expression
+.I expr
+is evaluated and its return value
+(converted to a string)
+replaces the escape sequence in the output.
+Multiple inline expressions may appear on the same line.
+.
+.PP
+All Lua code within a single invocation of
+.B pplua
+shares a common
+.BR sol::state ,
+so variables, functions, and state set in one block or
+.B \-e
+expression are visible to all subsequent code.
+.
+.PP
+The
+.B lroff
+library is automatically loaded into the Lua environment
+before any user code executes.
+It provides functions for emitting
+.I roff
+requests, escape sequences, text,
+managing diversions, defining macros,
+and constructing common document structures.
+See
+.BR lroff (3)
+for the complete API reference.
+.\"
+.\" ====================================================================
+.SH OPTIONS
+.\" ====================================================================
+.TP
+.BI \-e \~ code
+Execute the Lua string
+.I code
+before processing any input files.
+This option may be given multiple times;
+the code fragments are executed in order.
+Useful for setting variables or loading definitions:
+.RS
+.IP
+.EX
+pplua \-e 'DRAFT = true' doc.roff
+.EE
+.RE
+.
+.TP
+.BI \-l \~ file
+Load and execute the Lua file
+.I file
+before processing any input.
+This is equivalent to calling
+.B dofile()
+on the given path.
+This option may be given multiple times;
+files are loaded in order.
+Typically used for data files or shared library definitions:
+.RS
+.IP
+.EX
+pplua \-l data.lua \-l helpers.lua doc.roff
+.EE
+.RE
+.
+.TP
+.BI \-I \~ path
+Prepend
+.I path
+to Lua\[aq]s
+.BR package.path .
+The directory is added using the pattern
+.RI \[dq] path\c
+.BR /?.lua \[dq].
+This option may be given multiple times.
+.
+.TP
+.BI \-D \~ name\fR=\fIvalue
+Define the Lua global variable
+.I name
+with string value
+.IR value .
+If the value is a valid integer or number literal,
+it is stored as a Lua number instead.
+If no
+.BI = value
+part is given,
+the variable is set to
+.BR true .
+This option may be given multiple times:
+.RS
+.IP
+.EX
+pplua \-D LANG=en \-D SEED=42 \-D DRAFT doc.roff
+.EE
+.RE
+.
+.TP
+.B \-n
+Suppress the emission of
+.B .lf
+(line-file) requests in the output.
+By default,
+.B pplua
+emits
+.B .lf
+directives so that error messages from
+.BR groff (1)
+refer to the correct line numbers in the original input.
+Use
+.B \-n
+when the
+.B .lf
+requests interfere with downstream processing
+or when minimal output is desired.
+.
+.TP
+.B \-V
+Print version information and exit.
+.
+.TP
+.B \-h
+Print a brief usage summary and exit.
+.
+.PP
+.RI [ file\~ .\|.\|.]
+.RS
+Input files to process.
+If no files are given,
+or if a file name is
+.BR \- ,
+standard input is read.
+Multiple files are processed in sequence as if concatenated,
+sharing the same Lua state.
+.RE
+.\"
+.\" ====================================================================
+.SH "BLOCK SYNTAX"
+.\" ====================================================================
+A Lua block begins with the request
+.B .lua
+on a line by itself
+(with optional trailing whitespace)
+and ends with the request
+.B .endlua
+on a line by itself.
+.
+.PP
+.RS
+.EX
+\&.lua
+\-\- Lua code here
+for i = 1, 5 do
+    emit("Item " .. i)
+    request("br")
+end
+\&.endlua
+.EE
+.RE
+.
+.PP
+The collected lines between
+.B .lua
+and
+.B .endlua
+are passed to the Lua interpreter as a single chunk.
+The chunk name reported in error messages includes the source file
+name and the starting line number of the block.
+.
+.PP
+Any groff output generated by the Lua code
+(via the
+.B lroff
+library functions)
+is inserted into the output stream at the position of the
+.B .lua
+request.
+The
+.B .lua
+and
+.B .endlua
+request lines themselves produce no output.
+.
+.PP
+Blocks may not be nested.
+A
+.B .lua
+inside an already-open block is treated as ordinary Lua code
+(and will likely produce a syntax error).
+.\"
+.\" ====================================================================
+.SH "INLINE SYNTAX"
+.\" ====================================================================
+The escape sequence
+.BI \[rs]lua\[aq] expr \[aq]
+evaluates a single Lua expression and substitutes its result.
+.
+.PP
+.RS
+.EX
+The system has \[rs]lua\[aq]os.date("%Y")\[aq] as the current year.
+Computed value: \[rs]lua\[aq]math.pi * radius^2\[aq]
+.EE
+.RE
+.
+.PP
+.I expr
+must be a Lua expression (not a statement).
+It is wrapped internally as
+.BI "return (" "expr" ")"
+before evaluation.
+The result is converted to a string via
+.BR tostring ().
+If the expression evaluates to
+.BR nil ,
+an empty string is substituted.
+.
+.PP
+The delimiter character is the ASCII single quote
+.RB ( \[aq] ).
+If the expression itself must contain single quotes,
+use Lua\[aq]s alternative string syntax or escape mechanisms:
+.
+.RS
+.EX
+\[rs]lua\[aq]("hello"):upper()\[aq]
+.EE
+.RE
+.
+.PP
+Multiple inline expressions may appear on the same line.
+They are evaluated left to right.
+.\"
+.\" ====================================================================
+.SH "PROCESSING MODEL"
+.\" ====================================================================
+.B pplua
+processes input in a single pass, line by line:
+.
+.IP 1. 4n
+Command-line
+.B \-D
+definitions are set as Lua globals.
+.
+.IP 2.
+Command-line
+.B \-I
+paths are prepended to
+.BR package.path .
+.
+.IP 3.
+Command-line
+.B \-e
+code fragments are executed in order.
+.
+.IP 4.
+Command-line
+.B \-l
+files are loaded and executed in order.
+.
+.IP 5.
+Input files are read line by line.
+For each line:
+.RS
+.IP a) 4n
+If the line is
+.BR .lua ,
+begin accumulating a Lua block.
+.IP b)
+If currently inside a block, accumulate the line
+(unless it is
+.BR .endlua ,
+which terminates the block and triggers execution).
+.IP c)
+Otherwise, scan the line for
+.BI \[rs]lua\[aq] .\|.\|. \[aq]
+sequences and expand them.
+.IP d)
+Pass the (possibly expanded) line through to standard output.
+.RE
+.
+.IP 6.
+If
+.B \-n
+was not given, a
+.B .lf
+request is emitted before any output that follows a Lua block,
+restoring the correct line number for
+.BR groff (1)
+diagnostics.
+.
+.IP 7.
+After all input is consumed,
+any buffered output from the
+.B lroff
+library is flushed.
+.\"
+.\" ====================================================================
+.SH "LROFF LIBRARY OVERVIEW"
+.\" ====================================================================
+The following is a summary of the
+.B lroff
+Lua API categories.
+All functions are available as globals in the Lua environment
+(i.e., no module prefix is required).
+.
+.SS "Output"
+.TP 18n
+.BI emit( text )
+Append
+.I text
+to the output buffer.
+No newline is added.
+.TP
+.BI emitln( text )
+Append
+.I text
+followed by a newline.
+.TP
+.BI request( name )
+Emit a groff request
+.RI \[dq]. name \[dq]
+on its own line.
+.TP
+.BI request_with( name ", " args )
+Emit
+.RI \[dq]. name
+.IR args \[dq].
+.TP
+.BI comment( text )
+Emit a groff comment line:
+.BI .\[rs]\[dq] " text" \c
+\&.
+.TP
+.BI blank( n )
+Emit
+.I n
+blank lines (default\~1).
+.
+.SS "Escaping"
+.TP 18n
+.BI escape( text )
+Escape special roff characters in
+.I text
+.RB ( \[rs] ,
+.BR . ,
+.BR \[aq] )
+so it is treated as literal text.
+.TP
+.BI inline_escape( name ", " arg )
+Produce a groff inline escape, e.g.,\&
+.BR \[rs]f[B] .
+.
+.SS "Fonts and Sizes"
+.BR font (),
+.BR font_bold (),
+.BR font_italic (),
+.BR size (),
+.BR size_relative (),
+.BR with_font (),
+.BR with_size ().
+.
+.SS "Registers and Strings"
+.BR nr_set (),
+.BR nr_get (),
+.BR nr_ref (),
+.BR ds_set (),
+.BR ds_get (),
+.BR ds_ref ().
+.
+.SS "Diversions"
+.BR divert_begin (),
+.BR divert_end (),
+.BR divert_emit (),
+.BR divert_get ().
+.
+.SS "Macros"
+.BR macro_define (),
+.BR macro_define_lua ().
+.
+.SS "Text Styling"
+.BR bold (),
+.BR italic (),
+.BR mono (),
+.BR styled (),
+.BR special_char ().
+.
+.SS "Document Structure"
+.BR section (),
+.BR subsection (),
+.BR title (),
+.BR author (),
+.BR paragraph ().
+.
+.SS "Compound Structures"
+.BR table (),
+.BR bullet_list (),
+.BR numbered_list (),
+.BR def_list ().
+.
+.SS "Utility"
+.BR unique (),
+.BR version (),
+.BR map (),
+.BR foreach ().
+.
+.PP
+See
+.BR lroff (3)
+for detailed descriptions, argument types,
+and return values of every function.
+.\"
+.\" ====================================================================
+.SH EXAMPLES
+.\" ====================================================================
+.
+.SS "Basic pipeline"
+.EX
+pplua doc.roff | groff \-ms \-Tpdf > doc.pdf
+.EE
+.
+.SS "Full pipeline with preprocessors"
+.EX
+pplua doc.roff | tbl | eqn | groff \-ms \-Tpdf > doc.pdf
+.EE
+.
+.SS "Using a data file and definitions"
+.EX
+pplua \-l data.lua \-D DRAFT \-D LANG=en report.roff \[rs]
+    | groff \-ms \-Tpdf > report.pdf
+.EE
+.
+.SS "Generating exam variants"
+.EX
+pplua \-D SEED=1 exam.roff | groff \-ms \-Tpdf > exam\-v1.pdf
+pplua \-D SEED=2 exam.roff | groff \-ms \-Tpdf > exam\-v2.pdf
+.EE
+.
+.SS "Simple document with embedded Lua"
+.EX
+\&.TL
+Monthly Report
+\&.AU
+J.\& Doe
+\&.PP
+This report was generated on \[rs]lua\[aq]os.date("%B %d, %Y")\[aq].
+\&.lua
+section("Sales Figures")
+local data = { Jan=100, Feb=132, Mar=98 }
+local cols = {}
+for month, val in pairs(data) do
+    cols[#cols+1] = { month, tostring(val) }
+end
+table({"Month", "Units"}, cols)
+\&.endlua
+\&.PP
+End of report.
+.EE
+.\"
+.\" ====================================================================
+.SH DIAGNOSTICS
+.\" ====================================================================
+.B pplua
+writes all error messages to standard error.
+.
+.PP
+Lua errors include the source file name and line number
+where the
+.B .lua
+block began (or where the inline expression appeared),
+followed by the Lua error message.
+For example:
+.
+.RS
+.EX
+pplua: report.roff:42: attempt to index a nil value
+.EE
+.RE
+.
+.PP
+If a
+.B .lua
+block is opened but no matching
+.B .endlua
+is found before end of input,
+a diagnostic is issued:
+.
+.RS
+.EX
+pplua: report.roff:37: unterminated .lua block
+.EE
+.RE
+.
+.PP
+.B pplua
+exits with status\~0 on success and status\~1 if any error occurred
+during Lua execution or input processing.
+.\"
+.\" ====================================================================
+.SH ENVIRONMENT
+.\" ====================================================================
+.TP
+.B PPLUA_PATH
+If set, this value is prepended to Lua\[aq]s
+.B package.path
+before any
+.B \-I
+options are applied.
+The format is the standard Lua path format using
+.B ?\&
+as a placeholder (e.g.,\&
+.IR /usr/share/pplua/?.lua ).
+.
+.TP
+.B PPLUA_INIT
+If set, this string is executed as Lua code
+before any
+.B \-e
+options.
+Useful for site-wide initializations.
+.\"
+.\" ====================================================================
+.SH FILES
+.\" ====================================================================
+.TP
+.I /usr/local/share/pplua/?.lua
+Default search path for Lua library modules
+shipped with
+.BR pplua .
+.\"
+.\" ====================================================================
+.SH COMPATIBILITY
+.\" ====================================================================
+.B pplua
+requires Lua\~5.4 and the
+.B sol2
+C++ binding library (version\~4.x).
+.
+.PP
+The output of
+.B pplua
+is plain
+.I roff
+source compatible with all versions of
+.BR groff .
+No
+.BR groff -specific
+extensions are required in the output,
+although the
+.B lroff
+library may emit constructs specific to particular macro packages
+(e.g.,
+.BR ms ,
+.BR mom ,
+.BR man ).
+.
+.PP
+.B pplua
+is designed to coexist with standard ROFF preprocessors.
+It should appear
+.I first
+in the pipeline (or immediately after
+.BR soelim (1)),
+because its delimiters
+.RB ( .lua / .endlua )
+are not recognized by other preprocessors.
+.\"
+.\" ====================================================================
+.SH "TIPS AND BEST PRACTICES"
+.\" ====================================================================
+.IP \(bu 3n
+Keep data separate from presentation.
+Store structured data in external
+.B .lua
+files and load them with
+.BR \-l .
+.IP \(bu
+Use
+.B \-D
+flags to create document variants from a single source
+(e.g., language, draft/final, exam seeds).
+.IP \(bu
+Use
+.BR divert_begin () / divert_end ()
+to capture output that must be reordered
+(e.g., a table of contents generated after body text is processed).
+.IP \(bu
+For large projects, organize shared Lua modules under a directory
+and point to it with
+.BR \-I .
+.IP \(bu
+Prefer
+.B emitln()
+over
+.B emit()
+when writing complete groff request lines, to ensure proper line
+termination.
+.IP \(bu
+Use
+.B \-n
+during debugging to produce cleaner output
+that is easier to inspect.
+.\"
+.\" ====================================================================
+.SH "SEE ALSO"
+.\" ====================================================================
+.BR groff (1),
+.BR groff (7),
+.BR tbl (1),
+.BR eqn (1),
+.BR pic (1),
+.BR soelim (1),
+.BR groff_ms (7),
+.BR groff_mom (7),
+.BR groff_man (7),
+.BR lroff (3),
+.BR lua (1)
+.\"
+.\" ====================================================================
+.SH AUTHORS
+.\" ====================================================================
+.B pplua
+was designed as a modern Lua-based preprocessor for the
+.B groff
+document formatting system,
+following the traditional ROFF pre/post-processor architecture.
+.\"
+.\" ====================================================================
+.SH BUGS
+.\" ====================================================================
+Nested
+.BR .lua / .endlua
+blocks are not supported.
+.
+.PP
+The inline delimiter uses the single-quote character
+.RB ( \[aq] ),
+which cannot be changed.
+Lua expressions requiring literal single quotes must use
+alternative Lua string-quoting mechanisms.
+.
+.PP
+.B pplua
+does not attempt to parse or validate the groff output
+produced by the
+.B lroff
+library.
+Malformed requests emitted by Lua code will be passed
+through to
+.BR groff ,
+which will report its own errors.
+.
+.PP
+Report bugs to the project issue tracker.
