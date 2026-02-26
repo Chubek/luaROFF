@@ -13,7 +13,18 @@ To install this application, alongside the manpage:
 ```sh
 $ mkdir build && cd build
 $ cmake ..
-$ make && cmake install
+$ make && make install
 ```
 
-There are some goodies in `contrib/`. Manual is in `docs/VADE_MECUM.md`, but the manpage has all you need, just type in `man pplua` and swim in sloppy goodness of Opus 4-generated docs.
+The documentation is available in `docs/VADE_MECUM.md`. You can view it online [here](https://chubak.neocities.org/luaroff-vade-mecum). There is a Vim/Neovim syntax file in `contrib/`, plus a theme for `bat(1)`.
+
+The best way to grok luaROFF is to:
+1. Read the manpage, just type in `man pplua` and press enter in your terminal;
+2. Study the examples in the `examples/` directory;
+
+Short and sweet, luaROFF offers a substrate on top of what ROFF already has, through `.lua` and `.endlua` blocks, plus a Lua library called `lroff` which offers many facilities for interoperating with the regular ROFF requests. You could also evaluate an expression inline using the `\lua` escape command. I recommend reading the documentation on the web address I linked to.
+
+I realize this AI slop, but you can send AI slop PRs! I will not accept crappy PRs, just because this is slop, that does not mean your can spam it. This still a very useful program. For example, you can use it for syntax highlighting.
+
+Thanks, 
+~ Chubak
